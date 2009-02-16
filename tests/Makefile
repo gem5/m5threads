@@ -13,7 +13,7 @@ CPP := sparc64-unknown-linux-gnu-g++
 #CPP := g++
 
 #CFLAGS := -ggdb3 -O3 -D__DEBUG
-CFLAGS := -g -O3
+CFLAGS := -g -O3 -DM5_PROFILING
 
 CPPFLAGS := $(CFLAGS)
 

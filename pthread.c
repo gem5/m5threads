@@ -45,6 +45,7 @@
 
 #include "pthread_defs.h"
 #include "tls_defs.h"
+#include "profiling_hooks.h"
 
 #define restrict 
 
@@ -126,8 +127,9 @@ static void populate_thread_block_info() {
   }
 
   //Set a stack guard size
-  //In SPARC/M5, this is needed to avoid out-of-range accesses on register saves...
-  //See src/arch/sparc/process.hh -- sets stackBias to 2047
+  //In SPARC, this is actually needed to avoid out-of-range accesses on register saves...
+  //Largest I have seen is 2048 (sparc64)
+  //You could avoid this in theory by compiling with -mnostack-bias
   thread_block_info.stack_guard_size = 2048;
 
   //Total thread block size -- this is what we'll request to mmap
@@ -303,12 +305,16 @@ int pthread_mutex_init (pthread_mutex_t* mutex, const pthread_mutexattr_t* attr)
 }
 
 int pthread_mutex_lock (pthread_mutex_t* lock) {
+    PROFILE_LOCK_START(lock); 
     spin_lock((int*)&lock->PTHREAD_MUTEX_T_COUNT);
+    PROFILE_LOCK_END(lock);
     return 0;
 }
 
 int pthread_mutex_unlock (pthread_mutex_t* lock) {
+    PROFILE_UNLOCK_START(lock);
     spin_unlock((int*)&lock->PTHREAD_MUTEX_T_COUNT);
+    PROFILE_UNLOCK_END(lock);
     return 0;
 }
 
@@ -319,6 +325,9 @@ int pthread_mutex_destroy (pthread_mutex_t* mutex) {
 int pthread_mutex_trylock (pthread_mutex_t* mutex) {
     int acquired = trylock((int*)&mutex->PTHREAD_MUTEX_T_COUNT);
     if (acquired == 1) {
+	//Profiling not really accurate here...
+	PROFILE_LOCK_START(mutex);
+	PROFILE_LOCK_END(mutex);
         return 0;
     }
     return EBUSY;
@@ -339,6 +348,7 @@ int pthread_rwlock_destroy (pthread_rwlock_t* lock) {
 }
 
 int pthread_rwlock_rdlock (pthread_rwlock_t* lock) {
+    PROFILE_LOCK_START(lock);
     do {
         // this is to reduce the contention and a possible live-lock to lock->access_lock
         while (1) {
@@ -352,14 +362,17 @@ int pthread_rwlock_rdlock (pthread_rwlock_t* lock) {
         if ((pthread_t)PTHREAD_RWLOCK_T_WRITER(lock) == -1) {
             PTHREAD_RWLOCK_T_READERS(lock)++;
             spin_unlock((int*)&(PTHREAD_RWLOCK_T_LOCK(lock)));
+	    PROFILE_LOCK_END(lock);
             return 0;
         }
         spin_unlock((int*)&(PTHREAD_RWLOCK_T_LOCK(lock)));
     } while (1);
+    PROFILE_LOCK_END(lock);
     return 0;
 }
 
 int pthread_rwlock_wrlock (pthread_rwlock_t* lock) {
+    PROFILE_LOCK_START(lock);
     do {
         while (1) {
             pthread_t writer = PTHREAD_RWLOCK_T_WRITER(lock);
@@ -376,14 +389,17 @@ int pthread_rwlock_wrlock (pthread_rwlock_t* lock) {
         if ((pthread_t)PTHREAD_RWLOCK_T_WRITER(lock) == -1 && PTHREAD_RWLOCK_T_READERS(lock) == 0) {
             PTHREAD_RWLOCK_T_WRITER(lock) = pthread_self();
             spin_unlock((int*)&(PTHREAD_RWLOCK_T_LOCK(lock)));
+	    PROFILE_LOCK_END(lock);
             return 0;
         }
         spin_unlock((int*)&(PTHREAD_RWLOCK_T_LOCK(lock)));
     } while (1);
+    PROFILE_LOCK_END(lock);
     return 0;
 }
 
 int pthread_rwlock_unlock (pthread_rwlock_t* lock) {
+    PROFILE_UNLOCK_START(lock);
     spin_lock((int*)&(PTHREAD_RWLOCK_T_LOCK(lock)));
     if (pthread_self() == PTHREAD_RWLOCK_T_WRITER(lock)) {
         // the write lock will be released
@@ -393,6 +409,7 @@ int pthread_rwlock_unlock (pthread_rwlock_t* lock) {
         PTHREAD_RWLOCK_T_READERS(lock) = PTHREAD_RWLOCK_T_READERS(lock) - 1;
     }
     spin_unlock((int*)&(PTHREAD_RWLOCK_T_LOCK(lock)));
+    PROFILE_UNLOCK_END(lock);
     return 0;
 }
 
@@ -489,6 +506,7 @@ int pthread_cond_broadcast (pthread_cond_t* cond) {
 }
 
 int pthread_cond_wait (pthread_cond_t* cond, pthread_mutex_t* lock) {
+    PROFILE_COND_WAIT_START(cond);
     volatile int* thread_count  = &(PTHREAD_COND_T_THREAD_COUNT(cond));
     volatile int* flag = &(PTHREAD_COND_T_FLAG(cond));
     volatile int* count_lock    = &(PTHREAD_COND_T_COUNT_LOCK(cond));
@@ -514,6 +532,7 @@ int pthread_cond_wait (pthread_cond_t* cond, pthread_mutex_t* lock) {
     }
     spin_unlock(count_lock);
     pthread_mutex_lock(lock);
+    PROFILE_COND_WAIT_END(cond);
     return 0;
 }
 
@@ -602,6 +621,7 @@ int pthread_barrier_destroy (pthread_barrier_t *barrier)
 
 int pthread_barrier_wait (pthread_barrier_t* barrier)
 {
+    PROFILE_BARRIER_WAIT_START(barrier);
     int const initial_direction = PTHREAD_BARRIER_T_DIRECTION(barrier); //0 == up, 1 == down
 
     if (initial_direction == 0) {
@@ -627,7 +647,7 @@ int pthread_barrier_wait (pthread_barrier_t* barrier)
       //spin
       direction = PTHREAD_BARRIER_T_DIRECTION(barrier);
    }
-
+   PROFILE_BARRIER_WAIT_END(barrier);
    return 0;
 }
 

@@ -5,6 +5,13 @@ Daniel Sanchez, Stanford University
 
 Changelog
 ---------
+
+14-Feb-09
+- Added support for OpenMP in SPARC.
+- Fixed stack guard to work in SPARC64 (stack bias was insufficient).
+- Added optional profiling hooks to measure synchronization use. Compile with -DM5_PROFILING to use M5 profiling syscalls.
+- The Makefile now builds test programs linked with both m5threads (test_XXX) and the standard pthread library (test_XXX_p). This is done for debugging purposes, but note that **the _p binaries won't work in M5**.
+
 27-Jan-09
 - Added support for TLS in SPARC and x86-64 in static binaries. Alpha no longer works due to having unimplemented TLS support.
 - Fixed a race condition in rwlocks and condition variables.
