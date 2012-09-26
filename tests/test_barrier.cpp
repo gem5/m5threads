@@ -29,9 +29,9 @@ pthread_barrier_t barrier;
 void* run (void* arg) {
     long long int my_id = (long long int) arg;
     //A[my_id][0]++;
-    printf("%i BEFORE\n", my_id);
+    printf("%lli BEFORE\n", my_id);
     pthread_barrier_wait(&barrier);
-    printf("%i AFTER\n", my_id);
+    printf("%lli AFTER\n", my_id);
     //A[my_id][0]++;
     return NULL;
 }

@@ -31,7 +31,7 @@
 
 void func (int* f1) {
   int f2;
-  printf("Addr frame 1 = %llx, Addr frame 2 = %llx\n", f1, &f2);
+  printf("Addr frame 1 = %p, Addr frame 2 = %p\n", f1, &f2);
   if (&f2 > f1) {
     printf("Stack grows up (and this threading library needs to be fixed for your arch...)\n");
   } else {

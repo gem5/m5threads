@@ -27,7 +27,7 @@ static pthread_mutex_t trylock = PTHREAD_MUTEX_INITIALIZER;
 void* run1(void* arglist)
 {
     pthread_t id = pthread_self();
-    printf("[run1] TID=%d\n", id);
+    printf("[run1] TID=%d\n", (int)id);
 
     printf("[run1] started\n");
 

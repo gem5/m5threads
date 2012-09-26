@@ -48,7 +48,7 @@ void* chain(void* arglist)
     pthread_mutex_lock(&lock);
 
     int current = next;
-    printf("[Iteration %d, Thread %d] Got lock\n", iteration, id);
+    printf("[Iteration %d, Thread %lld] Got lock\n", iteration, id);
     intArray[current]++;
 
     //Uncomment this snip for longer-running critical section
@@ -60,7 +60,7 @@ void* chain(void* arglist)
 
     next = id;
 
-    printf("[Iteration %d, Thread %d] Critical section done, previously next=%d, now next=%d\n", iteration, id, current, next);
+    printf("[Iteration %d, Thread %lld] Critical section done, previously next=%d, now next=%d\n", iteration, id, current, next);
     pthread_mutex_unlock(&lock);
 
     pthread_barrier_wait(&barrier);

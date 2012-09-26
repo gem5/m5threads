@@ -4,20 +4,27 @@
 
 # 64-bit compiles
 #Uncomment to use sparc/alpha cross-compilers
-CC := sparc64-unknown-linux-gnu-gcc
-CPP := sparc64-unknown-linux-gnu-g++
+#CC := sparc64-unknown-linux-gnu-gcc
+#CPP := sparc64-unknown-linux-gnu-g++
 #CC := alpha-unknown-linux-gnu-gcc
 #CPP := alpha-unknown-linux-gnu-g++
-
+CC := arm-linux-gnueabi-gcc
+CPP := arm-linux-gnueabi-g++
 #CC := gcc
 #CPP := g++
 
+# Needed for support of v7 assembly instructions on ARM architecture
+ARM_FLAGS := -march=armv7-a -marm
+
 #CFLAGS := -ggdb3 -O3 -D__DEBUG
-CFLAGS := -g -O3 -DM5_PROFILING
+#CFLAGS := -g -O3 -DM5_PROFILING
+CFLAGS := -g -O3 $(ARM_FLAGS)
 
 CPPFLAGS := $(CFLAGS)
 
+# ARM support for OpenMP not tested (test_omp.o)
 TEST_OBJS := test_stackgrow.o test_pthreadbasic.o test_pthread.o test_atomic.o test_barrier.o test_lock.o test_malloc.o test_sieve.o  test___thread.o test_omp.o
+#TEST_OBJS := test_stackgrow.o test_pthreadbasic.o test_pthread.o test_atomic.o test_barrier.o test_lock.o test_malloc.o test_sieve.o  test___thread.o
 
 TEST_PROGS := $(TEST_OBJS:.o=)
 

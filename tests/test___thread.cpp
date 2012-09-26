@@ -37,7 +37,7 @@ void* run (void* arg)
 {
     long long int id = (long long int)arg;
     int i;
-    printf("&local[%d]=%p\n", id, &local);
+    printf("&local[%lld]=%p\n", id, &local);
     local += id;
     for (i = 0; i < count; i++) {
         local++;
@@ -79,13 +79,13 @@ int main (int argc, char** argv)
     }
 
     long long int local = (long long int)run((void*)0);
-    printf("local[0] = %d\n", local);
+    printf("local[0] = %lld\n", local);
 
     for (i = 1 ; i < thread_count; i++) {
         int joinResult = pthread_join(threads[i], 
                                       (void**)&local);
         assert(joinResult == 0);
-        printf("local[%d] = %d\n", i, local);
+        printf("local[%d] = %lld\n", i, local);
     }
     
     /*struct timeval endTime;

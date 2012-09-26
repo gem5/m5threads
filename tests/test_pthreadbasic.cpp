@@ -35,7 +35,7 @@ int main(int argc, const char** argv) {
     pthread_t pth;
     pthread_attr_t attr;
 
-    printf("Main thread initialized. TID=%d\n", pthread_self());
+    printf("Main thread initialized. TID=%d\n", (int)pthread_self());
     int result = pthread_attr_init(&attr);
     assert(result == 0);
     printf("Main thread called pthread_attr_init\n");
@@ -52,11 +52,11 @@ int main(int argc, const char** argv) {
     printf("Main thread creating 2nd thread...\n");
     result = pthread_create(&pth2, &attr, run, NULL);
 
-    printf("Main thread calling join w/ 1st thread (id=%llx)... (self=%llx)\n", pth, pthread_self());
+    printf("Main thread calling join w/ 1st thread (id=%lx)... (self=%lx)\n", pth, pthread_self());
     pthread_join(pth, NULL);
-    printf("Main thread calling join w/ 2nd thread (id=%llx)... (self=%llx)\n", pth2, pthread_self());
+    printf("Main thread calling join w/ 2nd thread (id=%lx)... (self=%lx)\n", pth2, pthread_self());
     pthread_join(pth2, NULL);
-    printf("Main thread has self=%d\n", pthread_self());
+    printf("Main thread has self=%d\n", (int)pthread_self());
 
     printf("Main thread done.\n");
 }

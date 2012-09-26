@@ -50,12 +50,12 @@ void* alloc(void* arglist)
     int bytes = iteration*(id +1);
     void* ptr = malloc(bytes);
     ptr_matrix[iteration][id] = ptr;
-    printf("[ALLOC %d, Thread %d] Allocated %d bytes, from %x to %x\n", iteration, id, bytes, (uint32)ptr, (uint32)(((char*)ptr) + bytes - 1));
+    printf("[ALLOC %d, Thread %lld] Allocated %d bytes, from %p to %p\n", iteration, id, bytes, ptr, ((char*)ptr) + bytes - 1);
 
     pthread_barrier_wait(&barrier);
     int target = (id + iteration) % nthreads;
     free(ptr_matrix[iteration][target]);
-    printf("[ALLOC %d, Thread %d] Freed %d's allocation, %x\n", iteration, id, target, (uint32)ptr_matrix[iteration][target]);
+    printf("[ALLOC %d, Thread %lld] Freed %d's allocation, %p\n", iteration, id, target, ptr_matrix[iteration][target]);
     //free(ptr_matrix[iteration][target]);
     return NULL;
 }

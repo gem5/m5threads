@@ -39,6 +39,8 @@
   #include "spinlock_alpha.h"
 #elif defined(__sparc)
   #include "spinlock_sparc.h"
+#elif defined (__arm__)
+  #include "spinlock_arm.h"
 #else
   #error "spinlock routines not available for your arch!\n"
 #endif
@@ -61,9 +63,9 @@
 #endif
 
 //Size and alignment requirements of "real" (NPTL/LinuxThreads) thread control block
-#define TCB_SIZE 512
-#define TCB_ALIGN sizeof(double)
-//TODO: Figure out real (NPTL/LinuxThreads) TCB space. 512 bytes should be enough.
+#define NPTL_TCB_SIZE 1184 // sizeof (struct pthread)
+#define NPTL_TCB_ALIGN sizeof(double)
+#define NPTL_TCBHEAD_T_SIZE (sizeof(tcbhead_t))
 
 //Thread control structure
 typedef struct {
@@ -133,26 +135,52 @@ static void populate_thread_block_info() {
   thread_block_info.stack_guard_size = 2048;
 
   //Total thread block size -- this is what we'll request to mmap
-  size_t sz = sizeof(pthread_tcb_t) + thread_block_info.tls_memsz + TCB_SIZE + thread_block_info.stack_guard_size + CHILD_STACK_SIZE;
+  #if TLS_TCB_AT_TP
+  size_t sz = sizeof(pthread_tcb_t) + thread_block_info.tls_memsz + NPTL_TCBHEAD_T_SIZE + thread_block_info.stack_guard_size + CHILD_STACK_SIZE;
+  #elif TLS_DTV_AT_TP
+  size_t sz = sizeof(pthread_tcb_t) + thread_block_info.tls_memsz + NPTL_TCB_SIZE + NPTL_TCBHEAD_T_SIZE + thread_block_info.stack_guard_size + CHILD_STACK_SIZE;
+  #else
+  #error "TLS_TCB_AT_TP xor TLS_DTV_AT_TP must be defined"
+  #endif
   //Note that TCB_SIZE is the "real" TCB size, not ours, which we leave zeroed (but some variables, notably errno, are somewhere inside there)
 
   //Align to multiple of CHILD_STACK_SIZE
   sz += CHILD_STACK_SIZE - 1;  
   thread_block_info.total_size = (sz>>CHILD_STACK_BITS)<<CHILD_STACK_BITS;
-
 }
 
-
 //Set up TLS block in current thread
+// @param th_block_addr:  beginning of entire thread memory space
 static void setup_thread_tls(void* th_block_addr) {
+  size_t tcb_offset = 0;
+  void *tlsblock = NULL;
+  char *tls_start_ptr = NULL;
+
+  #if TLS_DTV_AT_TP
+  th_block_addr += NPTL_TCB_SIZE;
+  #endif
+
   /* Compute the (real) TCB offset */
-  size_t tcb_offset = roundup(thread_block_info.tls_memsz, TCB_ALIGN);
+  #if TLS_DTV_AT_TP
+  tcb_offset = roundup(NPTL_TCBHEAD_T_SIZE, NPTL_TCB_ALIGN);
+  #elif TLS_TCB_AT_TP
+  tcb_offset = roundup(thread_block_info.tls_memsz, NPTL_TCB_ALIGN);
+  #else
+  #error "TLS_TCB_AT_TP xor TLS_DTV_AT_TP must be defined"
+  #endif
+
   /* Align the TLS block.  */
-  void* tlsblock = (void *) (((uintptr_t) th_block_addr + thread_block_info.tls_align - 1)
+  tlsblock = (void *) (((uintptr_t) th_block_addr + thread_block_info.tls_align - 1)
                        & ~(thread_block_info.tls_align - 1));
   /* Initialize the TLS block.  */
-  char* tls_start_ptr = ((char *) tlsblock + tcb_offset
-                           - roundup (thread_block_info.tls_memsz, thread_block_info.tls_align ?: 1));
+  #if TLS_DTV_AT_TP
+  tls_start_ptr = ((char *) tlsblock + tcb_offset);
+  #elif TLS_TCB_AT_TP
+  tls_start_ptr = ((char *) tlsblock + tcb_offset
+                       - roundup (thread_block_info.tls_memsz, thread_block_info.tls_align ?: 1));
+  #else
+  #error "TLS_TCB_AT_TP xor TLS_DTV_AT_TP must be defined"
+  #endif
 
   //DEBUG("Init TLS: Copying %d bytes from 0x%llx to 0x%llx\n", filesz, (uint64_t) initimage, (uint64_t) tls_start_ptr);
   memcpy (tls_start_ptr, thread_block_info.tls_initimage, thread_block_info.tls_filesz);
@@ -161,7 +189,13 @@ static void setup_thread_tls(void* th_block_addr) {
 
   //Note: We don't care about DTV pointers for x86/SPARC -- they're never used in static mode
   /* Initialize the thread pointer.  */
+  #if TLS_DTV_AT_TP
+  TLS_INIT_TP (tlsblock, 0);
+  #elif TLS_TCB_AT_TP
   TLS_INIT_TP ((char *) tlsblock + tcb_offset, 0);
+  #else
+  #error "TLS_TCB_AT_TP xor TLS_DTV_AT_TP must be defined"
+  #endif
 }
 
 //Some NPTL definitions
@@ -174,7 +208,7 @@ void __pthread_initialize_minimal() {
   __libc_multiple_threads = 1; //tell libc we're multithreaded (NPTL-specific)
   populate_thread_block_info();
   void* ptr = mmap(0, thread_block_info.total_size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-  setup_thread_tls(ptr);
+  setup_thread_tls(ptr + sizeof(pthread_tcb_t));
 }
 
 
@@ -211,7 +245,7 @@ int pthread_create (pthread_t* thread,
   tcb->child_finished = 0;
   tcb->start_routine = start_routine;
   tcb->arg = arg;
-  tcb->tls_start_addr = (void*)(((char*)thread_block) + sizeof(pthread_tcb_t)); //right after tcb
+  tcb->tls_start_addr = (void*)(((char*)thread_block) + sizeof(pthread_tcb_t)); //right after m5's tcb
   tcb->stack_start_addr = (void*) (((char*) thread_block) + thread_block_size - thread_block_info.stack_guard_size); //end of thread_block
   
   *thread=(pthread_t) thread_block;

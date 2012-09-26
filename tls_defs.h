@@ -28,8 +28,19 @@
 //These are mostly taken verbatim from glibc 2.3.6
 
 //32 for ELF32 binaries, 64 for ELF64
-//TODO: Macro it
+#if defined(__LP64__)
 #define __ELF_NATIVE_CLASS 64
+#else
+#define __ELF_NATIVE_CLASS 32
+#endif
+
+//Seems like all non-ARM M5 targets use TLS_TCB_AT_TP (defined in
+//  platform-specific 'tls.h')
+#if defined(__arm__)
+#define TLS_DTV_AT_TP 1
+#else
+#define TLS_TCB_AT_TP 1
+#endif
 
 /* Standard ELF types.  */
 
@@ -163,6 +174,47 @@ register struct pthread *__thread_self __asm__("%g7");
 /* Code to initially initialize the thread pointer.  */
 # define TLS_INIT_TP(descr, secondcall) \
   (__thread_self = (__typeof (__thread_self)) (descr), NULL)
+
+#elif defined (__arm__)
+
+typedef struct
+{
+  void *dtv;
+  void *private;
+} tcbhead_t;
+
+#define INTERNAL_SYSCALL_RAW(name, err, nr, args...)        \
+  ({ unsigned int _sys_result;                  \
+     {                              \
+       register int _a1 asm ("a1");             \
+       LOAD_ARGS_##nr (args)                    \
+           asm volatile ("mov r7, #0xf0000\n"    \
+                     "add r7, r7, #0x0005\n"  \
+         "swi   #0  @ syscall " #name       \
+             : "=r" (_a1)               \
+             : "i" (name) ASM_ARGS_##nr         \
+             : "memory");               \
+       _sys_result = _a1;                   \
+     }                              \
+     (int) _sys_result; })
+
+#undef INTERNAL_SYSCALL_ARM
+#define INTERNAL_SYSCALL_ARM(name, err, nr, args...)        \
+    INTERNAL_SYSCALL_RAW(__ARM_NR_##name, err, nr, args)
+
+#define LOAD_ARGS_0()
+
+#define ASM_ARGS_0
+
+#define LOAD_ARGS_1(a1)             \
+  int _a1tmp = (int) (a1);          \
+  LOAD_ARGS_0 ()                \
+  _a1 = _a1tmp;
+
+#define ASM_ARGS_1  ASM_ARGS_0, "r" (_a1)
+
+# define TLS_INIT_TP(descr, secondcall) \
+    INTERNAL_SYSCALL_ARM(set_tls, 0, 1, (descr))
 
 #else
   #error "No TLS defs for your architecture"
