@@ -300,11 +300,13 @@ void pthread_exit (void* status) {
 // mutex functions
 
 int pthread_mutex_init (pthread_mutex_t* mutex, const pthread_mutexattr_t* attr) {
+  DEBUG("%s: start\n", __FUNCTION__);
     mutex->PTHREAD_MUTEX_T_COUNT = 0;
     return 0;
 }
 
 int pthread_mutex_lock (pthread_mutex_t* lock) {
+  DEBUG("%s: start\n", __FUNCTION__);
     PROFILE_LOCK_START(lock); 
     spin_lock((int*)&lock->PTHREAD_MUTEX_T_COUNT);
     PROFILE_LOCK_END(lock);
@@ -312,6 +314,7 @@ int pthread_mutex_lock (pthread_mutex_t* lock) {
 }
 
 int pthread_mutex_unlock (pthread_mutex_t* lock) {
+  DEBUG("%s: start\n", __FUNCTION__);
     PROFILE_UNLOCK_START(lock);
     spin_unlock((int*)&lock->PTHREAD_MUTEX_T_COUNT);
     PROFILE_UNLOCK_END(lock);
@@ -319,10 +322,12 @@ int pthread_mutex_unlock (pthread_mutex_t* lock) {
 }
 
 int pthread_mutex_destroy (pthread_mutex_t* mutex) {
+  DEBUG("%s: start\n", __FUNCTION__);
     return 0;
 }
 
 int pthread_mutex_trylock (pthread_mutex_t* mutex) {
+  DEBUG("%s: start\n", __FUNCTION__);
     int acquired = trylock((int*)&mutex->PTHREAD_MUTEX_T_COUNT);
     if (acquired == 1) {
 	//Profiling not really accurate here...
@@ -336,6 +341,7 @@ int pthread_mutex_trylock (pthread_mutex_t* mutex) {
 // rwlock functions
 
 int pthread_rwlock_init (pthread_rwlock_t* lock, const pthread_rwlockattr_t* attr) {
+  DEBUG("%s: start\n", __FUNCTION__);
     PTHREAD_RWLOCK_T_LOCK(lock) = 0; // used only with spin_lock, so we know to initilize to zero
     PTHREAD_RWLOCK_T_READERS(lock) = 0;
     PTHREAD_RWLOCK_T_WRITER(lock) = -1; // -1 means no one owns the write lock
@@ -344,10 +350,12 @@ int pthread_rwlock_init (pthread_rwlock_t* lock, const pthread_rwlockattr_t* att
 }
 
 int pthread_rwlock_destroy (pthread_rwlock_t* lock) {
+  DEBUG("%s: start\n", __FUNCTION__);
     return 0;
 }
 
 int pthread_rwlock_rdlock (pthread_rwlock_t* lock) {
+  DEBUG("%s: start\n", __FUNCTION__);
     PROFILE_LOCK_START(lock);
     do {
         // this is to reduce the contention and a possible live-lock to lock->access_lock
@@ -372,6 +380,7 @@ int pthread_rwlock_rdlock (pthread_rwlock_t* lock) {
 }
 
 int pthread_rwlock_wrlock (pthread_rwlock_t* lock) {
+  DEBUG("%s: start\n", __FUNCTION__);
     PROFILE_LOCK_START(lock);
     do {
         while (1) {
@@ -399,6 +408,7 @@ int pthread_rwlock_wrlock (pthread_rwlock_t* lock) {
 }
 
 int pthread_rwlock_unlock (pthread_rwlock_t* lock) {
+  DEBUG("%s: start\n", __FUNCTION__);
     PROFILE_UNLOCK_START(lock);
     spin_lock((int*)&(PTHREAD_RWLOCK_T_LOCK(lock)));
     if (pthread_self() == PTHREAD_RWLOCK_T_WRITER(lock)) {
@@ -429,6 +439,7 @@ static pthread_mutex_t pthread_keys_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int pthread_key_create (pthread_key_t* key, void (*destructor)(void*)) {
   int i;
+  DEBUG("%s: start\n", __FUNCTION__);
 
   pthread_mutex_lock(&pthread_keys_mutex);
   for (i = 0; i < PTHREAD_KEYS_MAX; i++) {
@@ -447,6 +458,7 @@ int pthread_key_create (pthread_key_t* key, void (*destructor)(void*)) {
 
 int pthread_key_delete (pthread_key_t key)
 {
+  DEBUG("%s: start\n", __FUNCTION__);
   pthread_mutex_lock(&pthread_keys_mutex);
   if (key >= PTHREAD_KEYS_MAX || !pthread_keys[key].in_use) {
     pthread_mutex_unlock(&pthread_keys_mutex);
@@ -465,17 +477,12 @@ int pthread_key_delete (pthread_key_t key)
 
 int pthread_setspecific (pthread_key_t key, const void* value) {
   int m_size;
+  DEBUG("%s: start\n", __FUNCTION__);
   if (key < 0 || key >= PTHREAD_KEYS_MAX) return EINVAL; 
-  if (key >= pthread_specifics_size) {
-    m_size = (key+1)*sizeof(void*);
-    if (pthread_specifics_size == 0) {
-       pthread_specifics = (void**) malloc(m_size);
-       DEBUG("pthread_setspecific: malloc of size %d bytes, got 0x%llx\n", m_size, pthread_specifics);
-    } else {
-       pthread_specifics = (void**) realloc(pthread_specifics, m_size);
-       DEBUG("pthread_setspecific: realloc of size %d bytes, got 0x%llx\n", m_size, pthread_specifics);
-    }
-    pthread_specifics_size = key+1;
+  if (pthread_specifics_size == 0) {
+     pthread_specifics = (void**) calloc(PTHREAD_KEYS_MAX + 1, sizeof(void*));
+     DEBUG("pthread_setspecific: malloc of size %d bytes, got 0x%llx\n", m_size, pthread_specifics);
+     pthread_specifics_size = key+1;
   }
   pthread_specifics[key] = (void*) value;
   return 0;
@@ -490,6 +497,7 @@ void* pthread_getspecific (pthread_key_t key) {
 // condition variable functions
 
 int pthread_cond_init (pthread_cond_t* cond, const pthread_condattr_t* attr) {
+  DEBUG("%s: start\n", __FUNCTION__);
     PTHREAD_COND_T_FLAG(cond) = 0;
     PTHREAD_COND_T_THREAD_COUNT(cond) = 0;
     PTHREAD_COND_T_COUNT_LOCK(cond) = 0;
@@ -497,15 +505,18 @@ int pthread_cond_init (pthread_cond_t* cond, const pthread_condattr_t* attr) {
 }
 
 int pthread_cond_destroy (pthread_cond_t* cond) {
+  DEBUG("%s: start\n", __FUNCTION__);
     return 0;
 }
 
 int pthread_cond_broadcast (pthread_cond_t* cond) {
+  DEBUG("%s: start\n", __FUNCTION__);
     PTHREAD_COND_T_FLAG(cond) = 1;
     return 0;
 }
 
 int pthread_cond_wait (pthread_cond_t* cond, pthread_mutex_t* lock) {
+  DEBUG("%s: start\n", __FUNCTION__);
     PROFILE_COND_WAIT_START(cond);
     volatile int* thread_count  = &(PTHREAD_COND_T_THREAD_COUNT(cond));
     volatile int* flag = &(PTHREAD_COND_T_FLAG(cond));
@@ -537,6 +548,7 @@ int pthread_cond_wait (pthread_cond_t* cond, pthread_mutex_t* lock) {
 }
 
 int pthread_cond_signal (pthread_cond_t* cond) {
+  DEBUG("%s: start\n", __FUNCTION__);
     //Could also signal only one thread, but this is compliant too
     //TODO: Just wake one thread up
     return pthread_cond_broadcast(cond);
@@ -604,6 +616,7 @@ int pthread_barrier_init (pthread_barrier_t *restrict barrier,
                           const pthread_barrierattr_t *restrict attr, unsigned count)
 {
     assert(barrier != NULL);
+  DEBUG("%s: start\n", __FUNCTION__);
 
     PTHREAD_BARRIER_T_NUM_THREADS(barrier) =  count;
     PTHREAD_BARRIER_T_SPINLOCK(barrier) = 0;
@@ -615,12 +628,14 @@ int pthread_barrier_init (pthread_barrier_t *restrict barrier,
 
 int pthread_barrier_destroy (pthread_barrier_t *barrier)
 {
+  DEBUG("%s: start\n", __FUNCTION__);
     //Nothing to do
     return 0;
 }
 
 int pthread_barrier_wait (pthread_barrier_t* barrier)
 {
+  DEBUG("%s: start\n", __FUNCTION__);
     PROFILE_BARRIER_WAIT_START(barrier);
     int const initial_direction = PTHREAD_BARRIER_T_DIRECTION(barrier); //0 == up, 1 == down
 
@@ -657,6 +672,7 @@ static pthread_mutex_t __once_mutex = PTHREAD_MUTEX_INITIALIZER;
 int pthread_once (pthread_once_t* once,
                   void (*init)(void))
 {
+  DEBUG("%s: start\n", __FUNCTION__);
   //fast path
   if (*once != PTHREAD_ONCE_INIT) return 0;
   pthread_mutex_lock(&__once_mutex);
@@ -684,56 +700,70 @@ int pthread_equal (pthread_t t1, pthread_t t2)
 // functions really don't need to do anything
 
 int pthread_yield() {
+  DEBUG("%s: start\n", __FUNCTION__);
     // nothing else to yield to
     return 0;
 }
 
 int pthread_attr_init (pthread_attr_t* attr) {
+  DEBUG("%s: start\n", __FUNCTION__);
     return 0;
 }
 
 int pthread_attr_setscope (pthread_attr_t* attr, int scope) {
+  DEBUG("%s: start\n", __FUNCTION__);
     return 0;
 }
 
 int pthread_rwlockattr_init (pthread_rwlockattr_t* attr) {
+  DEBUG("%s: start\n", __FUNCTION__);
     return 0;
 }
 
 int pthread_attr_setstacksize (pthread_attr_t* attr, size_t stacksize) {
+  DEBUG("%s: start\n", __FUNCTION__);
     return 0;
 }
 
 int pthread_attr_setschedpolicy (pthread_attr_t* attr, int policy) {
+  DEBUG("%s: start\n", __FUNCTION__);
     return 0;
 }
 
 // some functions that we don't really support
 
 int pthread_setconcurrency (int new_level) {
+  DEBUG("%s: start\n", __FUNCTION__);
     return 0;
 }
 
 int pthread_setcancelstate (int p0, int* p1)
 {
+  DEBUG("%s: start\n", __FUNCTION__);
     //NPTL uses this
     return 0;
 }
 
 //and some affinity functions (used by libgomp, openmp)
 int pthread_getaffinity_np(pthread_t thread, size_t size, cpu_set_t *set) {
+  DEBUG("%s: start\n", __FUNCTION__);
+    char *p = (char*)set;
+    while ( size-- ) *p++ = 0;
   return 0;
 }
 
 int pthread_setaffinity_np(pthread_t thread, size_t size, cpu_set_t *set) {
+  DEBUG("%s: start\n", __FUNCTION__);
   return 0;
 }
 
 int pthread_attr_setaffinity_np(pthread_attr_t attr, size_t cpusetsize, const cpu_set_t *cpuset) {
+  DEBUG("%s: start\n", __FUNCTION__);
   return 0;
 }
 
 int pthread_attr_getaffinity_np(pthread_attr_t attr, size_t cpusetsize, cpu_set_t *cpuset) {
+  DEBUG("%s: start\n", __FUNCTION__);
   return 0;
 }
 
@@ -742,6 +772,7 @@ int pthread_attr_getaffinity_np(pthread_attr_t attr, size_t cpusetsize, cpu_set_
 // (maybe we should throw an error message instead?)
 
 int pthread_sigmask (int how, const sigset_t* set, sigset_t* oset) {
+  DEBUG("%s: start\n", __FUNCTION__);
     return 0;
 }
 
