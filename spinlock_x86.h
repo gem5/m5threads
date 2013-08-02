@@ -29,10 +29,10 @@ static __inline__ void spin_lock (volatile int* lock) {
         (
          "\n1:\t" \
          "cmpb $0,%1\n\t" \
-         "jne 1b\n\t" \
+         "ja 1b\n\t" \
          "xchgb %b0, %1\n\t" \
          "cmpb $0,%0\n" \
-         "jne 1b\n\t"
+         "ja 1b\n\t"
          :"=q"(oldval), "=m"(*lock)
          : "0"(1)
          : "memory");
