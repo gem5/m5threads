@@ -27,6 +27,7 @@
 #include <signal.h>
 #include <sys/errno.h>
 #include <sched.h>
+#include <linux/sched.h>
 #include <sys/mman.h>
 #include <string.h>
 #include <malloc.h>
