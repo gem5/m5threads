@@ -716,8 +716,8 @@ int pthread_once (pthread_once_t* once,
     return 0;
   }
   *once = PTHREAD_ONCE_INIT+1;
-  init();
   pthread_mutex_unlock(&__once_mutex);
+  init();
   return 0;
 }
 
